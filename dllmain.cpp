@@ -162,7 +162,8 @@ __declspec(dllexport) SFSEPluginVersionData SFSEPlugin_Version = {
 };
 
 // ReSharper disable once CppInconsistentNaming
-__declspec(dllexport) void SFSEPlugin_Load(const SFSEInterface* sfse) {
+// ReSharper disable once CppParameterNeverUsed
+__declspec(dllexport) bool SFSEPlugin_Load(const SFSEInterface* sfse) {
     SetupLog(GetLogPathAsCurrentDllDotLog());
 
     LOG(TARGET_NAME << " initializing.");
@@ -172,6 +173,7 @@ __declspec(dllexport) void SFSEPlugin_Load(const SFSEInterface* sfse) {
     });
     if (thread.joinable()) thread.detach();
 
-    LOG("Scan thread spawned."); // Don't remove. Plugin fails to load without it for some mysterious reason.
+    LOG("Scan thread spawned.");
+    return true;
 }
 };
