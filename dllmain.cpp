@@ -10,37 +10,155 @@
 
 #define LOG_VERSION(a) GET_EXE_VERSION_MAJOR(a) << "." << GET_EXE_VERSION_MINOR(a) << "." << GET_EXE_VERSION_BUILD(a) << "." << GET_EXE_VERSION_SUB(a)
 
-const std::vector<BYTE> LEA_START = StringToByteVector("48 8D 15");
+/*
+For game version 1.15.216.
 
-const std::map<std::string, std::vector<std::string>> TYPE_MAPPING = {
-    {"Allow-Unattached-Modules-Mod", {"SB_ERRORBODY_NOT_ATTACHED"}},
-    {"BayAndDocker-Count-Mod", {"SB_LIMITBODY_MAX_LANDING_BAY", "SB_LIMITBODY_MAX_DOCKER"}},
-    {"Build-Below-Bay-Mod", {"SB_ERRORBODY_MODULE_BELOW_LANDINGBAY", "SB_ERRORBODY_DOCKER_INVALID_POSITION", "SB_ERRORBODY_LANDINGENGINE_NOT_ALIGNED_WITH_LANDINGBAY"}},
-    {"Cockpit-Count-Mod", {"SB_LIMITBODY_MAX_COCKPIT"}},
-    {"Engine-Power-Mod", {"SB_LIMITBODY_EXCESS_POWER_ENGINE"}},
-    //{"GravDrive-Count-Mod", {"SB_LIMITBODY_MAX_GRAV_DRIVE"}}, // Winds up with "you need additional grav thrust".
-    {"GravDrive-Weight-Mod", {"SB_ERRORBODY_SHIP_TOO_HEAVY_TO_GRAVJUMP"}},
-    {"LandingGear-Count-Mod", {"SB_LIMITBODY_MIN_LANDING_GEAR"}},
-    {"Reactor-Class-Mod", {"SB_ERRORBODY_REACTOR_CLASS"}},
-    {"Reactor-Count-Mod", {"SB_LIMITBODY_MAX_REACTOR"}},
-    {"Shield-Count-Mod", {"SB_LIMITBODY_MAX_SHIELD"}},
-    {"Weapon-Power-Mod", {"SB_LIMITBODY_EXCESS_POWER_WEAPON", "SB_LIMITBODY_MAX_WEAPONS"}},
+0F 8? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D         (4k+ results.)
+0F 8? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D ?? ?? E8 ?? ?? ?? ?? 90
+90 E9
+    SB_LIMITBODY_MAX_REACTOR
+
+0F 8? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D      (200+ results.)
+90 E9
+    SB_LIMITBODY_MAX_SHIELD
+    SB_ERRORBODY_NOT_ATTACHED
+    SB_ERRORBODY_MODULE_BELOW_LANDINGBAY
+
+0F 8? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D
+90 E9
+    SB_LIMITBODY_MAX_WEAPONS
+
+83 38 0C 7F 0E ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D
+         90 90
+    SB_LIMITBODY_EXCESS_POWER_WEAPON
+
+39 81 ?? ?? ?? ?? 0F 8F ?? ?? ?? ?? 48 81 C1 ?? ?? ?? ?? 48 3B CA 75 E8
+                  90 90 90 90 90 90
+    SB_ERRORBODY_REACTOR_CLASS
+
+0F 8? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D
+90 E9
+    SB_LIMITBODY_MIN_LANDING_GEAR
+    SB_LIMITBODY_MAX_LANDING_BAY
+    SB_LIMITBODY_EXCESS_POWER_ENGINE
+    SB_LIMITBODY_MAX_GRAV_DRIVE // Winds up with "you need additional grav thrust".
+    SB_ERRORBODY_SHIP_TOO_HEAVY_TO_GRAVJUMP
+    SB_LIMITBODY_MAX_COCKPIT
+
+0F 8? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D
+90 E9
+    SB_LIMITBODY_MAX_DOCKER
+
+E8 ?? ?? ?? ?? 84 ?? 74 ?? 48 8D ?? ?? E8 ?? ?? ?? ?? 84 C0 74 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 76 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 76 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 76 ?? 48 8D ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 0F 85
+                     90 90                                  90 90                                                    90 90                            90 90                            90 90                                           90 E9
+    SB_ERRORBODY_DOCKER_INVALID_POSITION
+
+73 37 48 83 C3 04 49 3B DE 49 BB 89 88 88 88 88 88 88 88
+90 90
+    SB_ERRORBODY_LANDINGENGINE_NOT_ALIGNED_WITH_LANDINGBAY
+*/
+
+struct ChangeInfo {
+    std::string newBytes;
+    int         newBytesOffset;
 };
 
-const std::map<std::string, std::vector<std::string>> SCAN_MAPPING = {
-    {"Allow-Unattached-Modules-Mod", {"75 ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D 30"}}, // 75 == `jne`
-    {"BayAndDocker-Count-Mod", {"7E ?? ?? ?? ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D C8"}}, // 7E == `jle`
-    {"Build-Below-Bay-Mod", {"75 ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D 30"}}, // 75 == `jne`
-    {"Cockpit-Count-Mod", {"7E ?? ?? ?? ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D D0"}}, // 7E == `jle`
-    {"Engine-Power-Mod", {"7E ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D 30"}}, // 7E == `jle`
-    //{"GravDrive-Count-Mod", {"7E ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D 50"}}, // 7E == `jle`
-    {"GravDrive-Weight-Mod", {"73 ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D 30"}}, // 73 == `jae`
-    {"LandingGear-Count-Mod", {"75 ?? ?? ?? ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D D0"}}, // 75 == `jne`
-    {"Reactor-Class-Mod", {"75 ?? ?? ?? ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D D0"}}, // 75 == `jne`
-    {"Reactor-Count-Mod", {"7E ?? ?? ?? ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D D0"}}, // 7E == `jle`
-    {"Shield-Count-Mod", {"7E ?? ?? ?? ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D 58"}}, // 7E == `jle`
-    {"Weapon-Power-Mod", {"EB ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D 30", "7E ?? ?? ?? ?? 48 8D 15 ?? ?? ?? ?? 48 8D 4D 58"}}, // EB == `jmp`. This one's unique as the 74 (`je`) 4 ops before (-11 bytes) this to EB (`jmp`).
+struct PatchInfo {
+    std::string             sbConstString;
+    std::string             scanBytes;
+    std::vector<ChangeInfo> changes;
+    int                     leaStart; // Will not check string const if -1.
 };
+
+// Note: Scanner doesn't support half-wildcards like `8?`. Need to replace it with `??`.
+const std::map<std::string, std::vector<PatchInfo>> SCAN_INFO = {
+    {
+        "Allow-Unattached-Modules-Mod",
+        {
+            {"SB_ERRORBODY_NOT_ATTACHED", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 16},
+        }
+    },
+    {
+        "BayAndDocker-Count-Mod",
+        {
+            {"SB_LIMITBODY_MAX_LANDING_BAY", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 17},
+            {"SB_LIMITBODY_MAX_DOCKER", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 18},
+        }
+    },
+    {
+        "Build-Below-Bay-Mod",
+        {
+            {"SB_ERRORBODY_MODULE_BELOW_LANDINGBAY", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 16},
+            {
+                "SB_ERRORBODY_DOCKER_INVALID_POSITION",
+                "E8 ?? ?? ?? ?? 84 ?? 74 ?? 48 8D ?? ?? E8 ?? ?? ?? ?? 84 C0 74 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 76 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 76 ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 76 ?? 48 8D ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 0F 85",
+                {
+                    {"90 90", 7},
+                    {"90 90", 20},
+                    {"90 90", 39},
+                    {"90 90", 50},
+                    {"90 90", 61},
+                    {"90 E9", 77},
+                },
+                -1
+            }, // Only one match, don't check the string const.
+            {"SB_ERRORBODY_LANDINGENGINE_NOT_ALIGNED_WITH_LANDINGBAY", "73 37 48 83 C3 04 49 3B DE 49 BB 89 88 88 88 88 88 88 88", {{"90 90", 0}}, -1}, // Only one match, don't check the string const.
+        }
+    },
+    {
+        "Cockpit-Count-Mod",
+        {
+            {"SB_LIMITBODY_MAX_COCKPIT", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 17},
+        }
+    },
+    {
+        "Engine-Power-Mod",
+        {
+            {"SB_LIMITBODY_EXCESS_POWER_ENGINE", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 17},
+        }
+    },
+    {
+        "GravDrive-Weight-Mod",
+        {
+            {"SB_ERRORBODY_SHIP_TOO_HEAVY_TO_GRAVJUMP", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 17},
+        }
+    },
+    {
+        "LandingGear-Count-Mod",
+        {
+            {"SB_LIMITBODY_MIN_LANDING_GEAR", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 17},
+        }
+    },
+    {
+        "Reactor-Class-Mod",
+        {
+            {"SB_ERRORBODY_REACTOR_CLASS", "39 81 ?? ?? ?? ?? 0F 8F ?? ?? ?? ?? 48 81 C1 ?? ?? ?? ?? 48 3B CA 75 E8", {{"90 90 90 90 90 90", 6}}, -1}, // Only one match, don't check the string const.
+        }
+    },
+    {
+        "Reactor-Count-Mod",
+        {
+            {"SB_LIMITBODY_MAX_REACTOR", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D ?? ?? E8 ?? ?? ?? ?? 90", {{"90 E9", 0}}, 15},
+        }
+    },
+    {
+        "Shield-Count-Mod",
+        {
+            {"SB_LIMITBODY_MAX_SHIELD", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 16},
+        }
+    },
+    {
+        "Weapon-Power-Mod",
+        {
+            {"SB_LIMITBODY_EXCESS_POWER_WEAPON", "83 38 0C 7F 0E ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 90", 3}}, 30},
+            {"SB_LIMITBODY_MAX_WEAPONS", "0F ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 48 8D ?? ?? ?? ?? ?? 48 8D", {{"90 E9", 0}}, 14},
+        }
+    },
+};
+
+inline bool IsAddressValid(const UINT64 address, const UINT64 moduleAddr, const DWORD moduleSize) {
+    return address > moduleAddr && address < moduleAddr + moduleSize;
+}
 
 void DoInjection() {
     LOG(TARGET_NAME << " loading.");
@@ -54,68 +172,74 @@ void DoInjection() {
         LOG("If you're deliberately running this on an older release expect zero support and do not open bug reports about it not working.");
     }
 
-    const auto moduleName = GetExeFilename();
-    const auto moduleAddr = reinterpret_cast<const UINT64>(GetModuleHandle(moduleName.c_str()));
+    const auto moduleName   = GetExeFilename();
+    const auto moduleHandle = GetModuleHandle(moduleName.c_str());
+    const auto moduleAddr   = reinterpret_cast<const UINT64>(moduleHandle);
+    MODULEINFO moduleInfo{};
+    GetModuleInformation(GetCurrentProcess(), moduleHandle, std::addressof(moduleInfo), sizeof(moduleInfo));
+    const auto moduleSize = moduleInfo.SizeOfImage;
     LOG("Found module name: " << moduleName);
     LOG("Module base address: " << std::uppercase << std::hex << moduleAddr);
+    LOG("Module size: " << moduleSize);
 
-    const auto newBytes     = StringToByteVector("EB"); // EB == `jmp`
-    auto       patchedCount = 0;
+    auto patchedCount = 0;
 
-    for (const auto& pattern : SCAN_MAPPING.at(TARGET_NAME)) {
-        LOG("Doing AoB scan.");
+    const auto patchInfos = SCAN_INFO.at(TARGET_NAME);
+    LOG("Looking for " << patchInfos.size() << " patch targets.");
 
-        auto addressesFound = ScanMemory(moduleName, pattern);
+    for (const auto& patchInfo : patchInfos) {
+        LOG("Doing AoB scan for: " << patchInfo.sbConstString);
+
+        auto addressesFound = ScanMemory(moduleName, patchInfo.scanBytes);
         if (addressesFound.empty()) {
             LOG("AoB scan returned no results, aborting.");
             return;
         }
 
-        LOG("Found " << addressesFound.size() << " match(es).");
-
-        auto validTypes = TYPE_MAPPING.at(TARGET_NAME);
+        LOG("Found " << addressesFound.size() << " potential match(es).");
 
         for (const auto& address : addressesFound) {
             const auto addrBase     = reinterpret_cast<const UINT64>(address);
             const auto moduleOffset = addrBase - moduleAddr;
 
-            // Find the start of the `lea`.
-            const auto leaAddress = ScanMemory(moduleName, LEA_START, false, true, address)[0]; // AoBs differ, so scan for the `lea` from the AoB start address.
-            const auto leaBase    = reinterpret_cast<const UINT64>(leaAddress);
-            //LOG("`lea` found at: +" << std::uppercase << std::hex << reinterpret_cast<const UINT64>(leaAddress) - moduleAddr);
-            const auto leaOffset = *reinterpret_cast<const UINT32*>(leaAddress + 3); // In short, move the ptr 3 bytes, and dereference the 4 bytes (the `lea` offset) as an int. // NOLINT(clang-diagnostic-cast-qual)
-
-            const UINT64 strBegin = leaBase + leaOffset + 8; // +7 to offset to the end of the `lea` op, +1 to skip the char count. They're null-terminated anyways.
-            const auto   typeStr  = std::string(reinterpret_cast<const char*>(strBegin)); // NOLINT(performance-no-int-to-ptr)
-            //LOG("Found string: " << typeStr);
-
-            if (Contains(validTypes, typeStr)) {
-                LOG("Target address: " << std::uppercase << std::hex << addrBase << " (" << moduleName << " + " << moduleOffset << ")");
-                //PrintNBytes(address, 13);
+            if (patchInfo.leaStart > -1) {
+                //LOG("Checking address: " << std::uppercase << std::hex << addrBase << " (" << moduleName << " + " << moduleOffset << ")");
+                // Find the start of the `lea`.
+                const auto leaAddress = address + patchInfo.leaStart;
+                const auto leaBase    = reinterpret_cast<const UINT64>(leaAddress);
+                //LOG("`lea` found at: +" << std::uppercase << std::hex << leaBase - moduleAddr);
+                const auto leaOffset = *reinterpret_cast<const UINT32*>(leaAddress + 3); // In short, move the ptr 3 bytes, and dereference the 4 bytes (the `lea` offset) as an int. // NOLINT(clang-diagnostic-cast-qual)
                 //LOG("LEA offset: " << std::uppercase << std::hex << leaOffset);
-                //LOG("String addr: " << std::uppercase << std::hex << strBegin);
-                //LOG("Type string: " << typeStr);
 
-                if (std::strcmp(TARGET_NAME, "Weapon-Power-Mod") == 0 && typeStr == "SB_LIMITBODY_EXCESS_POWER_WEAPON") {
-                    auto jeAddress = address - 11;
+                const UINT64 strBegin = leaBase + leaOffset + 8; // +7 to offset to the end of the `lea` op, +1 to skip the char count. They're null-terminated anyways.
+                //LOG("String addr: " << std::uppercase << std::hex << strBegin << " (" << moduleName << " + " << (strBegin - moduleAddr) << ")");
 
-                    if (*jeAddress != 0x74) {
-                        LOG("Error finding `JE` for `Weapon-Power-Mod`. Expected `74`, found `" << std::uppercase << std::hex << *jeAddress << "`. Aborting.");
-                        continue;
-                    }
+                if (!IsAddressValid(strBegin, moduleAddr, moduleSize)) continue;
 
-                    LOG("JE offset (-11) address: " << std::uppercase << std::hex << reinterpret_cast<const UINT64>(jeAddress));
+                const auto typeStr = std::string(reinterpret_cast<const char*>(strBegin)); // NOLINT(performance-no-int-to-ptr)
+                //LOG("Read LEA string const: " << typeStr);
 
-                    DoWithProtect(const_cast<BYTE*>(jeAddress), 1, [newBytes, jeAddress] {
-                        memcpy(const_cast<BYTE*>(jeAddress), newBytes.data(), newBytes.size());
+                if (typeStr == patchInfo.sbConstString) {
+                    goto doPatch;
+                }
+            } else {
+            doPatch:
+                LOG("Target address: " << std::uppercase << std::hex << addrBase << " (" << moduleName << " + " << moduleOffset << ")");
+                LOG("Change count: " << patchInfo.changes.size());
+
+                for (UINT64 i = 0; i < patchInfo.changes.size(); i++) {
+                    const auto change = patchInfo.changes[i];
+
+                    const auto writeAddress = address + change.newBytesOffset;
+                    const auto newBytes     = StringToByteVector(change.newBytes);
+
+                    DoWithProtect(const_cast<BYTE*>(writeAddress), newBytes.size(), [writeAddress, newBytes] {
+                        memcpy(const_cast<BYTE*>(writeAddress), newBytes.data(), newBytes.size());
                     });
-                } else {
-                    DoWithProtect(const_cast<BYTE*>(address), 1, [newBytes, address] {
-                        memcpy(const_cast<BYTE*>(address), newBytes.data(), newBytes.size());
-                    });
+                    LOG("Change " << (i + 1) << " patched.");
                 }
 
-                LOG(typeStr << " patched.");
+                LOG(patchInfo.sbConstString << " patched.");
                 patchedCount++;
             }
         }
